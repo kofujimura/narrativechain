@@ -1,0 +1,21 @@
+{
+  "name": "narrativechain",
+  "version": "1.0.0",
+  "description": "AI-powered causal chain narrative generator from global news",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node main.js",
+    "experiment": "node experiment.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "dotenv": "^17.4.2",
+    "openai": "^6.37.0",
+    "rss-parser": "^3.13.0"
+  }
+}
