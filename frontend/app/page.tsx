@@ -1,6 +1,8 @@
 import { supabase, type CausalChain } from '../lib/supabase'
 import StoryList from './components/StoryList'
 
+export const dynamic = 'force-dynamic'
+
 async function fetchChains(): Promise<CausalChain[]> {
   const { data, error } = await supabase
     .from('causal_chains')

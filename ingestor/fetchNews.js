@@ -3,13 +3,11 @@ import RSSParser from 'rss-parser'
 const parser = new RSSParser()
 
 const FEEDS = [
-  { url: 'https://feeds.bbci.co.uk/news/business/rss.xml', source: 'BBC Business', category: 'finance' },
-  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'BBC World', category: 'politics' },
-  { url: 'https://www.ft.com/rss/home', source: 'Financial Times', category: 'finance' },
-  { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'Al Jazeera', category: 'politics' },
-  { url: 'https://feeds.npr.org/1001/rss.xml', source: 'NPR News', category: 'politics' },
-  { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', source: 'NYT World', category: 'politics' },
-  { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', source: 'NYT Business', category: 'finance' },
+  { url: 'https://news.web.nhk/n-data/conf/na/rss/cat0.xml', source: 'NHK総合', category: 'politics' },
+  { url: 'https://news.web.nhk/n-data/conf/na/rss/cat4.xml', source: 'NHK経済', category: 'finance' },
+  { url: 'https://rss.asahi.com/rss/asahi/newsheadlines.rdf', source: '朝日新聞', category: 'politics' },
+  { url: 'https://news.yahoo.co.jp/rss/topics/top-picks.xml', source: 'Yahoo!ニュース', category: 'politics' },
+  { url: 'https://mainichi.jp/rss/etc/mainichi-flash.rss', source: '毎日新聞', category: 'politics' },
 ]
 
 const failureCooldown = new Map()
