@@ -3,8 +3,7 @@ import OpenAI from 'openai'
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function generateCausalChain(article) {
-  const prompt = `あなたは地政学・経済・産業の因果関係を分析する専門家です。
-以下のニュースから、世界経済に波及する因果連鎖を4〜6ステップで推論してください。
+  const prompt = `以下のニュースから、日本企業の業績に波及する因果連鎖を4〜6ステップで推論してください。
 必要に応じてWeb検索で最新情報を確認してください。
 
 タイトル: ${article.title}
