@@ -4,8 +4,19 @@ import { filterTopArticles } from './agents/importanceFilter.js'
 import { generateCausalChain } from './agents/causalChain.js'
 import { saveArticles, getUnprocessedArticles, saveTriggerEvent, saveCausalChain } from './db/supabaseClient.js'
 
-const NEWS_INTERVAL_MS  = 30 * 60 * 1000   // 30分
-const ANALYSIS_INTERVAL_MS = 4 * 60 * 60 * 1000  // 4時間
+const NEWS_INTERVAL_MS     = 30 * 60 * 1000  // 30分
+const ANALYSIS_INTERVAL_MS =  1 * 60 * 60 * 1000  // 1時間
+const WINDOW_MS            =  4 * 60 * 60 * 1000  // スライディングウィンドウ幅
+
+// 選出済み記事ID → 選出日時
+const selectedArticles = new Map()
+
+function purgeOldSelections() {
+  const cutoff = Date.now() - WINDOW_MS
+  for (const [id, time] of selectedArticles) {
+    if (time < cutoff) selectedArticles.delete(id)
+  }
+}
 
 async function ingestNews() {
   console.log(`[${new Date().toISOString()}] ニュース取得開始`)
@@ -17,42 +28,46 @@ async function ingestNews() {
 async function runAnalysis() {
   console.log(`[${new Date().toISOString()}] 分析パイプライン開始`)
 
-  // 直近4時間のニュースを取得
-  const since = new Date(Date.now() - ANALYSIS_INTERVAL_MS)
-  const articles = await getUnprocessedArticles(since)
+  purgeOldSelections()
+
+  // 直近4時間のニュースを取得し、選出済みを除外
+  const since = new Date(Date.now() - WINDOW_MS)
+  const articles = (await getUnprocessedArticles(since))
+    .filter(a => !selectedArticles.has(a.id))
 
   if (articles.length === 0) {
-    console.log('分析対象のニュースがありません')
+    console.log('分析対象のニュースがありません（選出済み除外後）')
     return
   }
 
-  // 重要度上位3件を選出
-  const top3 = await filterTopArticles(articles, 3)
-  console.log(`上位3件を選出: ${top3.map(a => `[${a.importanceScore}] ${a.title}`).join(', ')}`)
+  console.log(`候補: ${articles.length}件（選出済み除外済み）`)
 
-  // 各記事について因果チェーン生成
-  for (const article of top3) {
-    try {
-      console.log(`因果チェーン生成中: ${article.title}`)
-      const result = await generateCausalChain(article)
+  // 重要度上位1件を選出
+  const [article] = await filterTopArticles(articles, 1)
+  console.log(`選出: [${article.importanceScore}] ${article.title}`)
 
-      const triggerEvent = await saveTriggerEvent(
-        article.id,
-        result.trigger,
-        article.category
-      )
+  selectedArticles.set(article.id, Date.now())
 
-      await saveCausalChain(
-        triggerEvent.id,
-        result.chain.length,
-        article.importanceScore,
-        result.chain
-      )
+  try {
+    console.log(`因果チェーン生成中: ${article.title}`)
+    const result = await generateCausalChain(article)
 
-      console.log(`保存完了: ${result.trigger}`)
-    } catch (e) {
-      console.error(`エラー (${article.title}):`, e.message)
-    }
+    const triggerEvent = await saveTriggerEvent(
+      article.id,
+      result.trigger,
+      article.category
+    )
+
+    await saveCausalChain(
+      triggerEvent.id,
+      result.chain.length,
+      article.importanceScore,
+      result.chain
+    )
+
+    console.log(`保存完了: ${result.trigger}`)
+  } catch (e) {
+    console.error(`エラー (${article.title}):`, e.message)
   }
 
   console.log(`[${new Date().toISOString()}] 分析パイプライン完了`)
