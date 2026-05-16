@@ -14,10 +14,10 @@ function formatDate(iso: string) {
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const pct = Math.round(score * 10)
+  const pct = Math.round(score)
   const color =
-    score >= 0.7 ? 'bg-red-100 text-red-700' :
-    score >= 0.4 ? 'bg-yellow-100 text-yellow-700' :
+    score >= 70 ? 'bg-red-100 text-red-700' :
+    score >= 40 ? 'bg-yellow-100 text-yellow-700' :
     'bg-zinc-100 text-zinc-500'
   return (
     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>

@@ -76,7 +76,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
           </p>
         )}
         <p className="mt-1 text-xs text-zinc-400">
-          スコア {Math.round(chain.score * 10)} &nbsp;·&nbsp; 深さ {chain.depth}
+          スコア {Math.round(chain.score)} &nbsp;·&nbsp; 深さ {chain.depth}
         </p>
       </section>
 
