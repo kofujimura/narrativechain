@@ -16,10 +16,11 @@ if (articles.length === 0) {
   process.exit(0)
 }
 
-console.log(`上位${TOP_N}件を選別中...`)
+console.log(`絶対基準を満たす記事から最大${TOP_N}件を選別中...`)
 const result = await filterTopArticles(articles, TOP_N)
 
 console.log('\n=== 結果 ===')
+if (result.length === 0) console.log('該当なし。物語生成の対象はありません。')
 result.forEach((a, i) => {
   console.log(`${i + 1}. [スコア: ${a.importanceScore}] ${a.title}`)
   console.log(`   理由: ${a.importanceReason}`)

@@ -27,7 +27,7 @@ URL: ${article.url}
 }`
 
   const response = await openai.responses.create({
-    model: process.env.OPENAI_MODEL || 'gpt-5.5',
+    model: process.env.OPENAI_MODEL || 'gpt-5.6-sol',
     tools: [{ type: 'web_search_preview' }],
     input: prompt,
   })

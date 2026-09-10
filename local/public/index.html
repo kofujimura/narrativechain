@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NarrativeChain — Local Studio</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header><a class="brand" href="/">n<span>↗</span> NarrativeChain</a><span class="tag">LOCAL STUDIO</span><span id="connection">接続中…</span></header>
+<main>
+<section class="intro"><div class="eyebrow">NEWS → NARRATIVE → EVIDENCE</div><h1>ニュースの、その先を読む。</h1><p>変化の大きいニュースから物語をつくり、気になる仮説を調査する。</p></section>
+<div class="workspace">
+<aside class="input-panel"><div class="section-label">01 / INPUT</div><h2>ニュースを届ける</h2>
+<label for="urls">URL <small>1行に1件</small></label><textarea id="urls" rows="3" placeholder="https://example.com/news/…"></textarea>
+<label for="content">本文・HTML</label><textarea id="content" rows="5" placeholder="ニュース本文またはHTMLを貼り付け"></textarea>
+<label class="file-drop" for="files">＋ ファイルを選ぶ <small>複数の .txt / .md / .html / .json</small><input id="files" type="file" accept=".txt,.md,.html,.htm,.json" multiple></label><p id="file-names" class="muted"></p>
+<label class="check"><input id="combine" type="checkbox">通過したニュースをまとめて1つの物語にする</label>
+<label class="check consent"><input id="consent" type="checkbox">送信できる本文であることを確認し、OpenAI APIでの生成に同意します。</label>
+<button id="generate" class="primary">物語をつくる <span>↗</span></button>
+<p class="fine">1〜6件。インパクト不足・情報不足なら生成しません。URLの有料壁・アクセス制限は回避しません。</p><div id="budget" class="budget"></div>
+<button id="samples" class="secondary">保存済みサンプルを見る <small>追加費用なし</small></button>
+</aside>
+<section class="stories-panel"><div class="section-top"><div><div class="section-label">02 / NARRATIVES</div><h2>調べたくなる物語</h2></div><span id="story-count" class="count">—</span></div>
+<p id="story-note" class="muted">保存済みの実験サンプルを読み込んでいます。</p><div id="error" role="alert" hidden></div><div id="filter-results"></div><div id="stories"></div></section>
+</div>
+<section class="research"><div class="section-top"><div><div class="section-label">03 / INVESTIGATION</div><h2>物語を、根拠で確かめる。</h2></div><button id="cancel" class="secondary" hidden>処理を中止</button></div><p class="muted">「調査する」で物語JSONをCLIへ。テーマ純度・発注先・案件寄与・反証を調べます。</p>
+<div class="research-grid"><div class="terminal"><div class="terminal-title"><span>● ● ●</span> TERMINAL / EVENT LOG</div><pre id="logs" aria-live="polite">調査を開始すると進行状況がここに表示されます。</pre></div><div class="report-panel"><div id="report-empty">調査結果はこのエリアに表示されます。<br><small>JSONから安全なHTMLを生成します。</small></div><iframe id="report" title="調査結果" sandbox="allow-popups allow-popups-to-escape-sandbox" hidden></iframe></div></div>
+<label for="history">保存した処理</label><select id="history"><option value="">履歴を選択</option></select></section>
+</main>
+<dialog id="research-dialog"><h2 id="dialog-title">この物語を調査しますか？</h2><p>物語と根拠テキストを、ローカルのCodex CLIへJSONで渡します。CLIは既存のログインを使用し、<strong>ChatGPT / Codex利用枠を消費します</strong>。物語生成のAPI予算とは別です。</p><p>第一段階は最大5分・2候補。Shell実行や売買は許可せず、未確認の指標は未確認のまま残します。</p><div class="dialog-actions"><button id="dialog-close" class="secondary">戻る</button><button id="demo" class="secondary">デモ接続テスト</button><button id="investigate" class="primary">同意して調査する ↗</button></div><small>デモは架空データで、外部調査を行いません。</small></dialog>
+<footer>LOCAL-FIRST RESEARCH · 物語は仮説です。受注・収益・投資成果を保証しません。</footer>
+</body></html>

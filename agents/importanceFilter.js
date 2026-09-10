@@ -1,43 +1,32 @@
-import OpenAI from 'openai'
+import { IMPACT_MODEL, buildImpactRequest, applyImpactGate, parseResponseJSON } from './impactPolicy.js'
+export { IMPACT_MODEL, buildImpactRequest, impactInputs, applyImpactGate, parseResponseJSON } from './impactPolicy.js'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-export async function filterTopArticles(articles, topN = 3) {
-  const articleList = articles.map((a, i) =>
-    `ID: ${a.source}-${i}\nタイトル: ${a.title}\n概要: ${a.body?.slice(0, 200)}`
-  ).join('\n\n---\n\n')
-
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-5.5',
-    response_format: { type: 'json_object' },
-    messages: [{
-      role: 'system',
-      content: `各ニュースが日本企業に与えるビジネスインパクトを0〜99で個別に評価してください。
-
-評価基準（厳密に適用すること）:
-80〜99: 特定業種の日本企業に影響（例：半導体・エネルギー・金融・情報・医療分野の企業提携や新技術や規制変更など）
-60〜79: 日本企業全体の収益・競争力・サプライチェーンに影響（例：為替の急激な変動・主要原材料の価格高騰）
-40〜59: 間接的に日本企業へ波及しうる海外の政治・経済動向
-20〜39: 日本企業への影響が限定的・短期的にのみ関係しうる話題
- 0〜19: 日本企業とほぼ無関係・事件・スポーツ・芸能・純粋なローカルニュース
-
-重要:
-- 同じ出来事を扱う記事が複数ある場合は、最もスコアが高い1件のみ結果に含め、他は除外すること。
-- 記事ごとに必ず異なるスコアと個別の理由を付けること。全記事に同じスコアを付けてはいけない。
-
-JSONで返してください: {"results": [{"id": "...", "score": 85, "reason": "日本企業への具体的な影響を1文で"}]}`
-    }, {
-      role: 'user',
-      content: articleList,
-    }],
-  })
-
-  const { results } = JSON.parse(response.choices[0].message.content)
-
-  const scored = articles.map((a, i) => {
-    const r = results.find(r => r.id === `${a.source}-${i}`)
-    return { ...a, importanceScore: r?.score ?? 0, importanceReason: r?.reason ?? '' }
-  }).sort((a, b) => b.importanceScore - a.importanceScore)
-
-  return scored.slice(0, topN)
+async function requestImpact(request) {
+  const { default: OpenAI } = await import('openai')
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0, timeout: 120000 })
+  return parseResponseJSON(await client.responses.create(request))
+}
+export async function assessArticleImpact(articles, { topN = 3, request = requestImpact,
+  model = process.env.OPENAI_FILTER_MODEL || IMPACT_MODEL } = {}) {
+  if (!Array.isArray(articles) || !Number.isInteger(topN) || topN < 0) throw new Error('Invalid filter arguments')
+  if (!articles.length || topN === 0) return { assessments: [], selected: [] }
+  // Bound each request. Only exact duplicates are removed across different batches.
+  const unique = [], duplicates = [], seen = new Map()
+  for (const a of articles) {
+    const key = a.url || (a.title ? `${a.source ?? ''}/${a.title}` : null)
+    if (key && seen.has(key)) { duplicates.push({ article: a, decision: 'duplicate', reason: '同一URLまたは同一ソース・見出し', duplicate_of_article: seen.get(key) }); continue }
+    if (key) seen.set(key, a.id ?? a.url ?? a.title)
+    unique.push(a)
+  }
+  const assessments = [], selected = []
+  for (let start = 0; start < unique.length; start += 8) {
+    const batch = unique.slice(start, start + 8)
+    const result = applyImpactGate(batch, await request(buildImpactRequest(batch, model)), batch.length)
+    assessments.push(...result.assessments.map(r => ({ ...r, batch: start / 8, article: batch[r.index] })))
+    selected.push(...result.selected)
+  }
+  return { assessments: [...assessments, ...duplicates], selected: selected.sort((a, b) => b.importanceScore - a.importanceScore).slice(0, topN) }
+}
+export async function filterTopArticles(articles, topN = 3, options = {}) {
+  return (await assessArticleImpact(articles, { ...options, topN })).selected
 }
