@@ -10,7 +10,10 @@
 <label for="content">本文・HTML</label><textarea id="content" rows="5" placeholder="ニュース本文またはHTMLを貼り付け"></textarea>
 <label class="file-drop" for="files">＋ ファイルを選ぶ <small>複数の .txt / .md / .html / .json</small><input id="files" type="file" accept=".txt,.md,.html,.htm,.json" multiple></label><p id="file-names" class="muted"></p>
 <label class="check"><input id="combine" type="checkbox">通過したニュースをまとめて1つの物語にする</label>
-<label class="check consent"><input id="consent" type="checkbox">送信できる本文であることを確認し、OpenAI APIでの生成に同意します。</label>
+<label for="backend">AI実行方式</label><select id="backend"><option value="codex">Codex / ChatGPTサブスク枠（標準）</option><option value="api">OpenAI API（別途従量課金）</option></select>
+<p id="backend-status" class="fine">Codexログインを確認しています…</p>
+<label class="check consent"><input id="consent" type="checkbox"><span id="consent-text">送信できる本文であることを確認し、ChatGPT / Codex利用枠の消費に同意します。</span></label>
+<label id="api-cost-label" class="check consent" hidden><input id="api-cost" type="checkbox">サブスクとは別のOpenAI API従量課金に同意します。</label>
 <button id="generate" class="primary">物語をつくる <span>↗</span></button>
 <p class="fine">1〜6件。インパクト不足・情報不足なら生成しません。URLの有料壁・アクセス制限は回避しません。</p><div id="budget" class="budget"></div>
 <button id="samples" class="secondary">保存済みサンプルを見る <small>追加費用なし</small></button>
@@ -22,6 +25,6 @@
 <div class="research-grid"><div class="terminal"><div class="terminal-title"><span>● ● ●</span> TERMINAL / EVENT LOG</div><pre id="logs" aria-live="polite">調査を開始すると進行状況がここに表示されます。</pre></div><div class="report-panel"><div id="report-empty">調査結果はこのエリアに表示されます。<br><small>JSONから安全なHTMLを生成します。</small></div><iframe id="report" title="調査結果" sandbox="allow-popups allow-popups-to-escape-sandbox" hidden></iframe></div></div>
 <label for="history">保存した処理</label><select id="history"><option value="">履歴を選択</option></select></section>
 </main>
-<dialog id="research-dialog"><h2 id="dialog-title">この物語を調査しますか？</h2><p>物語と根拠テキストを、ローカルのCodex CLIへJSONで渡します。CLIは既存のログインを使用し、<strong>ChatGPT / Codex利用枠を消費します</strong>。物語生成のAPI予算とは別です。</p><p>第一段階は最大5分・2候補。Shell実行や売買は許可せず、未確認の指標は未確認のまま残します。</p><div class="dialog-actions"><button id="dialog-close" class="secondary">戻る</button><button id="demo" class="secondary">デモ接続テスト</button><button id="investigate" class="primary">同意して調査する ↗</button></div><small>デモは架空データで、外部調査を行いません。</small></dialog>
+<dialog id="research-dialog"><h2 id="dialog-title">この物語を調査しますか？</h2><p>物語と根拠テキストを、ローカルのCodex CLIへJSONで渡します。CLIはChatGPTログインを使用し、<strong>ChatGPT / Codex利用枠を消費します</strong>。標準の物語生成と同じ利用枠です。API従量課金へ自動切替はしません。</p><p>第一段階は最大5分・2候補。Shell実行や売買は許可せず、未確認の指標は未確認のまま残します。</p><div class="dialog-actions"><button id="dialog-close" class="secondary">戻る</button><button id="demo" class="secondary">デモ接続テスト</button><button id="investigate" class="primary">同意して調査する ↗</button></div><small>デモは架空データで、外部調査を行いません。</small></dialog>
 <footer>LOCAL-FIRST RESEARCH · 物語は仮説です。受注・収益・投資成果を保証しません。</footer>
 </body></html>

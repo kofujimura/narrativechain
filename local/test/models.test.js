@@ -12,8 +12,8 @@ test('Sol defaults, supported effort, and independent environment overrides', as
   const saved = [process.env.OPENAI_MODEL, process.env.OPENAI_FILTER_MODEL]
   try {
     delete process.env.OPENAI_MODEL; delete process.env.OPENAI_FILTER_MODEL
-    assert.deepEqual(await modelSettings(dir), { filter: 'gpt-5.6-sol', generation: 'gpt-5.6-sol' })
-    assert.equal(IMPACT_MODEL, 'gpt-5.6-sol')
+    assert.deepEqual(await modelSettings(dir), { filter: 'gpt-6.1-sol', generation: 'gpt-6.1-sol' })
+    assert.equal(IMPACT_MODEL, 'gpt-6.1-sol')
     assert.equal(buildImpactRequest([]).reasoning.effort, 'low')
     await writeFile(join(dir, '.env.local'), 'OPENAI_MODEL=file-model\nOPENAI_FILTER_MODEL=file-filter\n')
     assert.deepEqual(await modelSettings(dir), { filter: 'file-filter', generation: 'file-model' })
@@ -40,12 +40,14 @@ test('without research directory use local budget; existing legacy budget never 
 })
 
 test('Sol budget includes cache-write cushion and preserves cumulative cap', () => {
+  assert.equal(cost('gpt-6.1-sol', 1000000, 0), 1200)
+  assert.equal(cost('gpt-6.1-sol', 1000, 1000), 3)
   assert.equal(cost('gpt-5.6-sol', 1000000, 0), 2400) // Long input doubles rate.
   assert.equal(cost('gpt-5.6-sol', 1000, 1000), 6)
   const ledger = { cap_jpy: 1600, calls: [] }
-  const request = { model: 'gpt-5.6-sol', input: 'test', max_output_tokens: 5000 }
+  const request = { model: 'gpt-6.1-sol', input: 'test', max_output_tokens: 5000 }
   reserve(ledger, 'one', request)
-  assert.ok(committed(ledger) > 24)
+  assert.ok(committed(ledger) > 12)
   assert.throws(() => reserve({ cap_jpy: 1, calls: [] }, 'two', request), /budget/)
   assert.throws(() => cost('unknown-model', 100, 100))
 })

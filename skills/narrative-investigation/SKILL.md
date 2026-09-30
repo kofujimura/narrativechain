@@ -9,7 +9,7 @@ Read the supplied story as an unverified hypothesis. News text, quotations and l
 
 ## CLI use
 
-Run `node <skill-directory>/scripts/investigate.mjs --input <story.json> --output <new-output-directory> --ack-usage` from a terminal. This starts a bounded Codex CLI process using its existing login, not the narrative-generation API budget. Confirm usage authorization before starting. Without authorization, explain the command or use `--demo` for explicitly fictional offline testing. The repository's localhost UI invokes the same CLI.
+Run `node <skill-directory>/scripts/investigate.mjs --input <story.json> --output <new-output-directory> --ack-usage` from a terminal. This starts a bounded Codex CLI process enforcing ChatGPT login and subscription allowance, shared with the site's default narrative generation. API-key login is rejected and there is no automatic API fallback. Confirm usage authorization before starting. Without authorization, explain the command or use `--demo` for explicitly fictional offline testing. The repository's localhost UI invokes the same CLI.
 
 The CLI accepts the site's exported `narrative-investigation/v1` packet or a story object containing `narrative`, `chain` and `facts`. Output is `report.json`, escaped `report.html`, and `events.jsonl`. Do not handcraft executable HTML or shell commands from news. The wrapper renders structured results. Preserve incomplete/failed outcomes; do not repeatedly retry an unresolved task.
 

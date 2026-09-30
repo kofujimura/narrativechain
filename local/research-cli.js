@@ -4,6 +4,8 @@ import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { reportSchema, validateReport, renderReport } from './report.js'
+import { DEFAULT_MODEL } from '../agents/modelConfig.js'
+import { codexEnvironment, codexExecArgs, requireChatGPTLogin } from './codex-client.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export function validatePacket(packet) {
@@ -11,16 +13,14 @@ export function validatePacket(packet) {
   if (!story || typeof story.narrative !== 'string' || !story.narrative.trim() || story.narrative.length > 15000 || !Array.isArray(story.chain) || !Array.isArray(story.facts) || story.facts.length > 6 || JSON.stringify(packet).length > 180000) throw Error('物語JSONの形式またはサイズが不正です。サイトのJSON出力を使用してください。')
   return story
 }
-export function codexArgs(dir, schemaPath, outputPath) {
-  const args = ['exec', '--json', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--skip-git-repo-check', '--sandbox', 'read-only',
-    '--cd', dir, '--output-schema', schemaPath, '--output-last-message', outputPath, '-c', 'approval_policy="never"', '-c', 'web_search="live"']
-  for (const feature of ['shell_tool', 'unified_exec', 'apps', 'plugins', 'hooks', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'skill_search', 'workspace_dependencies']) args.push('--disable', feature)
-  return [...args, '-']
+export function codexArgs(dir, schemaPath, outputPath, model = process.env.NARRATIVE_RESEARCH_MODEL || DEFAULT_MODEL) {
+  return codexExecArgs(dir, schemaPath, outputPath, { model, webSearch: 'live' })
 }
 export async function investigate({ packet, outputDir, demo = false, ackUsage = false, signal, log = () => {}, timeoutMs = 300000 }) {
   const story = validatePacket(packet)
   if (signal?.aborted) throw Error('調査を中止しました。')
   if (!demo && !ackUsage) throw Error('Codex利用枠を消費します。--ack-usage が必要です。')
+  if (!demo) await requireChatGPTLogin({ signal })
   await mkdir(outputDir, { recursive: true, mode: 0o700 })
   const reportPath = join(outputDir, 'report.json')
   try { await access(join(outputDir, 'started.json')); throw Error('この調査フォルダは使用済みです。上書き・自動再試行しません。') } catch (e) { if (e.code !== 'ENOENT') throw e }
@@ -38,7 +38,7 @@ export async function investigate({ packet, outputDir, demo = false, ackUsage = 
     await writeFile(schemaPath, JSON.stringify(reportSchema), { mode: 0o600 })
     const skill = await readFile(join(root, 'skills/narrative-investigation/SKILL.md'), 'utf8')
     await emit('status', 'Codex CLI調査開始。最大5分・2候補。Shell/アプリ連携は無効。')
-    const childEnv = Object.fromEntries(['PATH', 'HOME', 'USER', 'LOGNAME', 'TMPDIR', 'CODEX_HOME', 'SSL_CERT_FILE', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'].filter(k => process.env[k]).map(k => [k, process.env[k]]))
+    const childEnv = codexEnvironment()
     const child = spawn(process.env.NARRATIVE_CODEX_BIN || 'codex', codexArgs(outputDir, schemaPath, rawPath), { cwd: outputDir, env: childEnv, shell: false, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] })
     let ended = false
     child.once('close', () => { ended = true })

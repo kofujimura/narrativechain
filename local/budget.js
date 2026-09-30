@@ -1,8 +1,9 @@
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
-// Verified 2026-09-10: https://developers.openai.com/api/docs/models/gpt-5.6-sol
-export const prices = { 'gpt-5.6-sol': [4, 20], 'gpt-5-mini-2025-08-07': [0.25, 2], 'gpt-5.5-2026-04-23': [5, 30] };
+// GPT-6.1 Sol verified 2026-10-01: https://developers.openai.com/api/docs/changelog#september-2026
+// Retain earlier rates for saved usage and explicit model overrides.
+export const prices = { 'gpt-6.1-sol': [2, 10], 'gpt-5.6-sol': [4, 20], 'gpt-5-mini-2025-08-07': [0.25, 2], 'gpt-5.5-2026-04-23': [5, 30] };
 export const conversion = 200 * 1.2; // Budget assumption + cushion, NOT observed FX or invoice.
 export const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export async function readJSON(path, fallback) {
@@ -17,8 +18,9 @@ export async function saveJSON(path, value) {
 export function cost(model, input, output) {
   if (!prices[model] || !Number.isSafeInteger(input) || input < 0 || !Number.isSafeInteger(output) || output < 0) throw Error('Invalid model or token usage');
   // Conservatively treat all Sol input as cache writes (1.25x); not an invoice.
-  const cacheWriteCushion = model === 'gpt-5.6-sol' ? 1.25 : 1;
-  const longContext = model === 'gpt-5.6-sol' && input > 272000;
+  const sol = ['gpt-5.6-sol', 'gpt-6.1-sol'].includes(model);
+  const cacheWriteCushion = sol ? 1.25 : 1;
+  const longContext = sol && input > 272000;
   return (input * prices[model][0] * cacheWriteCushion * (longContext ? 2 : 1) + output * prices[model][1] * (longContext ? 1.5 : 1)) / 1e6 * conversion;
 }
 export function ceiling(body) {

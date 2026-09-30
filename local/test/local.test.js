@@ -36,6 +36,9 @@ test('inert HTML and links cannot execute source/model markup', () => {
 test('CLI packet validation and sandbox arguments', () => {
   validatePacket(packet); assert.throws(() => validatePacket({ story: { narrative: 'x' } }))
   const args = codexArgs('/tmp/space path', '/tmp/schema.json', '/tmp/result.json')
+  assert.equal(args[args.indexOf('--model') + 1], process.env.NARRATIVE_RESEARCH_MODEL || 'gpt-6.1-sol')
+  const override = codexArgs('/tmp/space path', '/tmp/schema.json', '/tmp/result.json', 'explicit-model')
+  assert.equal(override[override.indexOf('--model') + 1], 'explicit-model')
   assert.ok(args.includes('read-only')); assert.ok(args.includes('--ignore-user-config')); assert.ok(args.includes('shell_tool')); assert.ok(!args.includes('--dangerously-bypass-approvals-and-sandbox'))
 })
 test('standalone CLI workflow demo writes JSON+safe HTML and refuses overwrite', async () => {
@@ -52,7 +55,7 @@ test('standalone CLI workflow demo writes JSON+safe HTML and refuses overwrite',
 })
 test('localhost API: CSRF/Host protection, zero-story generation, persistence, research subprocess demo', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'narrative-server-test-'))
-  const app = await createLocalServer({ dataDir: dir, generate: async () => ({ articles: [], assessments: [], stories: [], note: '該当なし' }) })
+  const app = await createLocalServer({ dataDir: dir, codexStatus: async () => ({ ready: true, method: 'chatgpt', message: 'テスト' }), generate: async ({ backend }) => { assert.equal(backend, 'codex'); return { articles: [], assessments: [], stories: [], note: '該当なし', backend } } })
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${app.server.address().port}`, b = await (await fetch(base + '/api/bootstrap')).json()
   const post = async (path, value) => fetch(base + path, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json', 'X-Narrative-Token': b.token }, body: JSON.stringify(value) })
@@ -62,10 +65,12 @@ test('localhost API: CSRF/Host protection, zero-story generation, persistence, r
     const rebinding = await new Promise(resolve => { http.get(base, { headers: { Host: 'evil.test' } }, res => { res.resume(); resolve(res.statusCode) }) })
     assert.equal(rebinding, 403)
     assert.equal((await post('/api/generate', { inputs: [], consent: false })).status, 400)
+    assert.equal((await post('/api/generate', { inputs: [{ type: 'text', content: 'test' }], consent: true, backend: 'api' })).status, 400)
+    assert.equal((await post('/api/generate', { inputs: [{ type: 'text', content: 'test' }], consent: true, backend: 'unknown' })).status, 400)
     const generation = await post('/api/generate', { inputs: [{ type: 'text', content: 'test' }], consent: true })
-    // On fresh checkouts without a key, the endpoint correctly refuses paid mode.
-    if (generation.status === 202) { const j = await wait((await generation.json()).id); assert.equal(j.status, 'complete'); assert.deepEqual(j.result.stories, []) }
-    else assert.equal(generation.status, 409)
+    assert.equal(generation.status, 202)
+    const j = await wait((await generation.json()).id); assert.equal(j.status, 'complete'); assert.deepEqual(j.result.stories, [])
+    const html = await (await fetch(base + `/api/jobs/${j.id}/stories`)).text(); assert.match(html, /物語を生成していません/)
     if (b.samples.length) {
       const p = await (await fetch(base + `/api/packet?job=samples&story=${b.samples[0].id}`)).json(); validatePacket(p)
       assert.equal((await post('/api/investigate', { sourceJobId: 'samples', storyId: b.samples[0].id })).status, 400)

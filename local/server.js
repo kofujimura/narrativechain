@@ -5,9 +5,11 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { generateStories } from './generate.js'
-import { apiKey, budgetStatus } from './api-client.js'
+import { apiKey, budgetStatus, generationBackend } from './api-client.js'
+import { codexLoginStatus } from './codex-client.js'
 import { readJSON, saveJSON } from './budget.js'
 import { renderReport } from './report.js'
+import { renderStoriesHTML } from './story-html.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const json = (res, code, value) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value)) }
@@ -17,7 +19,7 @@ async function body(req) {
   for await (const chunk of req) { bytes += chunk.length; if (bytes > 1800000) throw Error('入力は合計1.8MB以内にしてください。'); buffers.push(chunk) }
   return JSON.parse(Buffer.concat(buffers).toString('utf8'))
 }
-export async function createLocalServer({ dataDir = join(root, 'local/data'), generate = generateStories } = {}) {
+export async function createLocalServer({ dataDir = join(root, 'local/data'), generate = generateStories, codexStatus = codexLoginStatus } = {}) {
   const jobsDir = join(dataDir, 'jobs'); await mkdir(jobsDir, { recursive: true, mode: 0o700 })
   const token = randomBytes(32).toString('hex'), jobs = new Map(), active = new Map(), samples = []
   try {
@@ -67,17 +69,27 @@ export async function createLocalServer({ dataDir = join(root, 'local/data'), ge
         const name = u.pathname === '/' ? 'index.html' : u.pathname.slice(1), content = await readFile(join(root, 'local/public', name))
         res.writeHead(200, { 'Content-Type': name.endsWith('.html') ? 'text/html; charset=utf-8' : name.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' }); res.end(content); return
       }
-      if (req.method === 'GET' && u.pathname === '/api/bootstrap') return json(res, 200, { token, api_configured: Boolean(await apiKey(root)), budget: await budgetStatus(root).catch(() => null), samples, jobs: [...jobs.values()].reverse() })
+      if (req.method === 'GET' && u.pathname === '/api/bootstrap') return json(res, 200, { token, default_backend: await generationBackend(root), codex: await codexStatus(), api_configured: Boolean(await apiKey(root)), budget: await budgetStatus(root).catch(() => null), samples, jobs: [...jobs.values()].reverse() })
       if (req.method === 'GET' && u.pathname === '/api/packet') {
         const story = getStory(u.searchParams.get('job'), u.searchParams.get('story'))
         if (!story) return json(res, 404, { error: '物語が見つかりません。' })
         res.setHeader('Content-Disposition', 'attachment; filename="narrative-investigation.json"')
         return json(res, 200, { schema_version: 'narrative-investigation/v1', exported_at: new Date().toISOString(), story })
       }
-      const match = u.pathname.match(/^\/api\/jobs\/([a-f0-9-]{36})(\/report)?$/)
+      const match = u.pathname.match(/^\/api\/jobs\/([a-f0-9-]{36})(\/(?:report|stories|story-\d+\.json))?$/)
       if (req.method === 'GET' && match) {
         const job = jobs.get(match[1]); if (!job) return json(res, 404, { error: 'ジョブが見つかりません。' })
         if (!match[2]) return json(res, 200, job)
+        if (/\/story-\d+\.json$/.test(match[2])) {
+          const story = getStory(job.id, match[2].slice(1, -5))
+          if (!story) return json(res, 404, { error: '物語が見つかりません。' })
+          return json(res, 200, { schema_version: 'narrative-investigation/v1', story })
+        }
+        if (match[2] === '/stories') {
+          if (!job.result?.stories) return json(res, 409, { error: '物語はまだありません。' })
+          res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(renderStoriesHTML(job.result)); return
+        }
         if (!job.result?.report) return json(res, 409, { error: 'レポートはまだありません。' })
         res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(renderReport(job.result.report, { demo: job.result.demo })); return
@@ -85,8 +97,15 @@ export async function createLocalServer({ dataDir = join(root, 'local/data'), ge
       if (req.method === 'POST' && u.pathname === '/api/generate') {
         const input = await body(req)
         if (input.consent !== true || !Array.isArray(input.inputs) || input.inputs.length < 1 || input.inputs.length > 6) return json(res, 400, { error: '送信許可の確認と1〜6件の入力が必要です。' })
-        if (!await apiKey(root)) return json(res, 409, { error: 'OPENAI_API_KEYが必要です。保存済みサンプルは無料で表示できます。' })
-        const job = await startJob('generation', options => generate({ ...options, inputs: input.inputs, combine: input.combine === true }))
+        const backend = await generationBackend(root, input.backend)
+        if (backend === 'api') {
+          if (input.ackApiCost !== true) return json(res, 400, { error: 'API従量課金の明示的な同意が必要です。' })
+          if (!await apiKey(root)) return json(res, 409, { error: 'APIモードにはOPENAI_API_KEYが必要です。サブスク版はCodexのChatGPTログインを使用します。' })
+        } else {
+          const status = await codexStatus()
+          if (!status.ready) return json(res, 409, { error: status.message })
+        }
+        const job = await startJob('generation', options => generate({ ...options, backend, inputs: input.inputs, combine: input.combine === true }))
         return json(res, 202, job)
       }
       if (req.method === 'POST' && u.pathname === '/api/investigate') {

@@ -2,7 +2,11 @@
 
 ## ローカル物語・調査スタジオ
 
-`npm run local:start` で [http://localhost:4317](http://localhost:4317) を開きます。URL・HTML・テキスト・複数ファイルからインパクト選別と物語生成を行い、「調査する」でCodex CLIへJSONを渡して根拠付きレポートを表示します。本番DBとは独立しています。[使い方・単体CLI・制約](local/README.md)を参照してください。
+`npm start`（または `npm run local:start`）で [http://localhost:4317](http://localhost:4317) を開きます。**標準では、選別・物語生成・調査すべてCodexのChatGPTサブスクリプション枠を使用します。APIキー・Supabaseは不要です。** URL・HTML・テキスト・複数ファイルから物語を作り、「調査する」で根拠付きレポートを表示します。API課金は明示選択・別途同意時のみで、自動切替しません。[使い方・単体CLI・制約](local/README.md)を参照してください。
+
+`npm run skill:install` で `$narrative-story`（ニュース→物語JSON・HTML）と `$narrative-investigation`（物語→詳細調査）を登録できます。単体生成は `npm run narrative -- --input news.html --output local/data/new-stories --ack-usage`。既定モデルは `gpt-6.1-sol` です。
+
+以下は旧RSS/Supabaseサービスの説明です。こちらはAPI従量課金の別経路で、`NARRATIVE_LLM_BACKEND=api npm run service:start` と明示した場合のみ起動します。`npm start` はローカル・サブスク版に変更しました。
 
 ## 投資仮説の研究・バックテスト
 
@@ -10,7 +14,7 @@
 
 研究フォルダが手元にある環境では `npm run research:status` で実行結果を確認できます。`research:*` コマンドは個人実験用です。通常の検証は `npm test`。2026-09-10にインパクト選別と「該当なしなら生成しない」制御を本番コードにも追加しました（サービス未起動）。
 
-ニュースから将来予測の物語を自動生成するシステム。GPT-5.6 Solがニュースのトリガーイベントを起点に因果連鎖を推論し、複数ステップの予測物語を生成する。
+ニュースから将来予測の物語を自動生成するシステム。GPT-6.1 Solがニュースのトリガーイベントを起点に因果連鎖を推論し、複数ステップの予測物語を生成する。
 
 **例：**
 > ホルムズ海峡封鎖 → ナフサの不足 → 廃プラスチックの再利用が注目される → 再生プラスチック企業の評価が高まる
@@ -30,7 +34,7 @@
 
 | 役割 | 技術 |
 |------|------|
-| LLM | OpenAI GPT-5.6 Sol（環境変数で変更可能） |
+| LLM | OpenAI GPT-6.1 Sol（環境変数で変更可能） |
 | Web調査 | OpenAI `web_search_preview` |
 | バックエンド | Node.js + PM2 |
 | データベース | Supabase |
@@ -49,8 +53,8 @@ cp .env.example .env  # APIキーを設定
 
 ```
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5.6-sol
-OPENAI_FILTER_MODEL=gpt-5.6-sol
+OPENAI_MODEL=gpt-6.1-sol
+OPENAI_FILTER_MODEL=gpt-6.1-sol
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
@@ -58,7 +62,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 PM2で起動：
 
 ```bash
-pm2 start main.js --name narrativechain
+NARRATIVE_LLM_BACKEND=api pm2 start main.js --name narrativechain
 pm2 save
 pm2 startup
 ```

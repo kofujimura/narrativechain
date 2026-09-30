@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { DEFAULT_MODEL } from './modelConfig.js'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -27,7 +28,7 @@ URL: ${article.url}
 }`
 
   const response = await openai.responses.create({
-    model: process.env.OPENAI_MODEL || 'gpt-5.6-sol',
+    model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
     tools: [{ type: 'web_search_preview' }],
     input: prompt,
   })

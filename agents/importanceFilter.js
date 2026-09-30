@@ -6,11 +6,7 @@ async function requestImpact(request) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0, timeout: 120000 })
   return parseResponseJSON(await client.responses.create(request))
 }
-export async function assessArticleImpact(articles, { topN = 3, request = requestImpact,
-  model = process.env.OPENAI_FILTER_MODEL || IMPACT_MODEL } = {}) {
-  if (!Array.isArray(articles) || !Number.isInteger(topN) || topN < 0) throw new Error('Invalid filter arguments')
-  if (!articles.length || topN === 0) return { assessments: [], selected: [] }
-  // Bound each request. Only exact duplicates are removed across different batches.
+export function deduplicateImpactArticles(articles) {
   const unique = [], duplicates = [], seen = new Map()
   for (const a of articles) {
     const key = a.url || (a.title ? `${a.source ?? ''}/${a.title}` : null)
@@ -18,6 +14,14 @@ export async function assessArticleImpact(articles, { topN = 3, request = reques
     if (key) seen.set(key, a.id ?? a.url ?? a.title)
     unique.push(a)
   }
+  return { unique, duplicates }
+}
+export async function assessArticleImpact(articles, { topN = 3, request = requestImpact,
+  model = process.env.OPENAI_FILTER_MODEL || IMPACT_MODEL } = {}) {
+  if (!Array.isArray(articles) || !Number.isInteger(topN) || topN < 0) throw new Error('Invalid filter arguments')
+  if (!articles.length || topN === 0) return { assessments: [], selected: [] }
+  // Bound each request. Only exact duplicates are removed across different batches.
+  const { unique, duplicates } = deduplicateImpactArticles(articles)
   const assessments = [], selected = []
   for (let start = 0; start < unique.length; start += 8) {
     const batch = unique.slice(start, start + 8)

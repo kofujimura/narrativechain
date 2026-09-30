@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id)
 let token = '', sourceJobId = 'samples', pendingStory = null, activeJobId = null, sampleStories = [], knownJobs = [], pollTimer
+let configuration = null, backendInitialized = false
 function element(tag, text, className) { const el = document.createElement(tag); if (text != null) el.textContent = text; if (className) el.className = className; return el }
 function error(message) { $('error').textContent = message; $('error').hidden = !message }
 async function request(path, value) {
@@ -28,10 +29,20 @@ function history() {
   $('history').firstChild.value = ''
   for (const job of knownJobs) { const option = element('option', `${new Date(job.created_at).toLocaleString('ja-JP')} · ${job.type} · ${job.status}`); option.value = job.id; $('history').append(option) }
 }
+function renderBackend() {
+  if (!configuration) return
+  const api = $('backend').value === 'api'
+  $('api-cost-label').hidden = !api
+  $('consent-text').textContent = api ? '送信できる本文であることを確認し、APIへの送信に同意します。' : '送信できる本文であることを確認し、ChatGPT / Codex利用枠の消費に同意します。'
+  $('connection').textContent = api ? (configuration.api_configured ? '● API MODE / 従量課金' : '○ APIキー未設定') : (configuration.codex.ready ? '● CODEX / サブスク枠' : '○ ChatGPTログインが必要')
+  $('backend-status').textContent = api ? '別途API課金です。明示的に同意した場合のみ実行します。' : configuration.codex.message
+  $('budget').textContent = api ? configuration.budget ? `API予算: 残り ${Math.floor(configuration.budget.remaining).toLocaleString()}円相当 / 上限 ${configuration.budget.cap.toLocaleString()}円相当。` : 'API予算台帳を確認してください。' : '標準: 生成・調査ともChatGPT / Codex利用枠を消費。APIキー不要。利用上限時は停止し、自動切替しません。'
+}
 async function bootstrap() {
   const state = await request('/api/bootstrap'); token = state.token; sampleStories = state.samples; knownJobs = state.jobs
-  $('connection').textContent = state.api_configured ? '● LOCAL CONNECTED' : '○ APIキー未設定'
-  $('budget').textContent = state.budget ? `API予算: 残り ${Math.floor(state.budget.remaining).toLocaleString()}円相当 / 累計上限 ${state.budget.cap.toLocaleString()}円相当。Codex利用枠は別。` : 'API予算台帳がありません。実験設定を確認してください。'
+  configuration = state
+  if (!backendInitialized) { $('backend').value = state.default_backend; backendInitialized = true }
+  renderBackend()
   history(); return state
 }
 function renderJob(job) {
@@ -71,10 +82,11 @@ $('generate').addEventListener('click', async () => {
       if (!/\.(txt|md|html?|json)$/i.test(file.name)) throw Error('対応形式: txt / md / html / json')
       inputs.push({ type: /\.html?$/i.test(file.name) ? 'html' : /\.json$/i.test(file.name) ? 'json' : 'text', name: file.name, content: await file.text() })
     }
-    const job = await request('/api/generate', { inputs, combine: $('combine').checked, consent: $('consent').checked }); $('story-note').textContent = '入力を選別し、通過したニュースだけで生成しています。'; await watch(job.id)
+    const job = await request('/api/generate', { inputs, combine: $('combine').checked, consent: $('consent').checked, backend: $('backend').value, ackApiCost: $('api-cost').checked }); $('story-note').textContent = '入力を選別し、通過したニュースだけで生成しています。'; await watch(job.id)
   } catch (e) { error(e.message); $('generate').disabled = false }
 })
 $('files').addEventListener('change', () => { $('file-names').textContent = [...$('files').files].map(f => f.name).join(' / ') })
+$('backend').addEventListener('change', () => { $('consent').checked = false; $('api-cost').checked = false; renderBackend() })
 $('samples').addEventListener('click', () => { renderStories(sampleStories, 'samples'); $('filter-results').replaceChildren(); $('story-note').textContent = '前回の実験で生成した実際のサンプルです。表示による追加費用はありません。' })
 $('dialog-close').addEventListener('click', () => $('research-dialog').close())
 async function investigate(demo) {

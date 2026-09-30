@@ -2,8 +2,7 @@ import 'dotenv/config'
 import { fetchAllNews } from './ingestor/fetchNews.js'
 import { assessArticleImpact } from './agents/importanceFilter.js'
 import { analyzeEligibleArticles } from './agents/analysisPipeline.js'
-import { generateCausalChain } from './agents/causalChain.js'
-import { saveArticles, getUnprocessedArticles, saveTriggerEvent, saveCausalChain } from './db/supabaseClient.js'
+let saveArticles, getUnprocessedArticles, saveTriggerEvent, saveCausalChain
 
 const NEWS_INTERVAL_MS     = 30 * 60 * 1000  // 30分
 const ANALYSIS_INTERVAL_MS =  1 * 60 * 60 * 1000  // 1時間
@@ -51,6 +50,7 @@ async function runAnalysis() {
       return report.selected
     },
     generate: async article => {
+      const { generateCausalChain } = await import('./agents/causalChain.js')
       console.log(`選出: [${article.importanceScore}] ${article.title}`)
       selectedArticles.set(article.id, Date.now())
       try {
@@ -70,6 +70,8 @@ async function runAnalysis() {
 }
 
 async function main() {
+  if (process.env.NARRATIVE_LLM_BACKEND !== 'api') throw Error('旧RSS/SupabaseサービスはAPI従量課金専用です。明示する場合のみ NARRATIVE_LLM_BACKEND=api npm run service:start を使用してください。サブスク版は npm start です。')
+  ;({ saveArticles, getUnprocessedArticles, saveTriggerEvent, saveCausalChain } = await import('./db/supabaseClient.js'))
   console.log('NarrativeChain 起動')
 
   // 起動直後に両方実行
@@ -81,4 +83,4 @@ async function main() {
   setInterval(() => runAnalysis().catch(() => console.error('選別/分析処理に失敗。未選別記事からの生成は行いません。')), ANALYSIS_INTERVAL_MS)
 }
 
-main().catch(console.error)
+main().catch(error => { console.error(error.message); process.exitCode = 1 })

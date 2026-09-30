@@ -3,8 +3,9 @@ import { parseEnv } from 'node:util'
 import { join } from 'node:path'
 import { reserve, settle, saveJSON, readJSON, hash, committed } from './budget.js'
 import { parseResponseJSON } from '../agents/impactPolicy.js'
+import { DEFAULT_MODEL } from '../agents/modelConfig.js'
 
-async function setting(root, name) {
+export async function setting(root, name) {
   if (process.env[name]) return process.env[name]
   for (const file of ['research/.env.local', '.env.local', '.env']) {
     try { const env = parseEnv(await readFile(join(root, file), 'utf8')); if (env[name]) return env[name] } catch (e) { if (e.code !== 'ENOENT') throw e }
@@ -12,8 +13,17 @@ async function setting(root, name) {
   return null
 }
 export const apiKey = root => setting(root, 'OPENAI_API_KEY')
+export async function generationBackend(root, override) {
+  const backend = override ?? await setting(root, 'NARRATIVE_LLM_BACKEND') ?? 'codex'
+  if (!['codex', 'api'].includes(backend)) throw Error('実行方式は codex または api を指定してください。')
+  return backend
+}
+export async function codexModelSettings(root) {
+  const model = await setting(root, 'NARRATIVE_MODEL') || DEFAULT_MODEL
+  return { filter: await setting(root, 'NARRATIVE_FILTER_MODEL') || model, generation: model }
+}
 export async function modelSettings(root) {
-  return { filter: await setting(root, 'OPENAI_FILTER_MODEL') || 'gpt-5.6-sol', generation: await setting(root, 'OPENAI_MODEL') || 'gpt-5.6-sol' }
+  return { filter: await setting(root, 'OPENAI_FILTER_MODEL') || DEFAULT_MODEL, generation: await setting(root, 'OPENAI_MODEL') || DEFAULT_MODEL }
 }
 export async function budgetDirectory(root) {
   const legacy = join(root, 'research/data/llm-budget')
@@ -42,7 +52,7 @@ export async function paidJSON(root, jobDir, id, request, { signal, log = () => 
     if (request.model === 'gpt-5.6-sol' && new Date().toISOString().slice(0, 10) > '2026-11-21') throw Error('Solの価格表を公式資料で再確認してください（確認期限2026-11-21）。')
     const row = reserve(ledger, `local/${id}`, request), path = join(jobDir, `${id.split('/').at(-1)}-response.json`)
     if (row.status === 'complete') { const result = await readJSON(path); if (hash(result) !== row.response_hash) throw Error('保存結果の不一致'); return result.result }
-    const requestCap = request.model === 'gpt-5.6-sol' ? 100 : 50
+    const requestCap = ['gpt-5.6-sol', 'gpt-6.1-sol'].includes(request.model) ? 100 : 50
     if (row.reserved_jpy > requestCap) throw Error(`1リクエストの上限${requestCap}円相当を超えます。入力を減らしてください。`)
     await saveJSON(ledgerPath, ledger)
     log(`OpenAI API開始（最大予約 ${row.reserved_jpy.toFixed(2)}円相当）`)
