@@ -1,8 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { supabase, type ChainWithNodes } from '../../../lib/supabase'
+import { type ChainWithNodes } from '../../../lib/supabase'
+import { requireResearchOwner } from '../../../lib/research-auth'
+
+export const dynamic = 'force-dynamic'
 
 async function fetchChain(id: string): Promise<ChainWithNodes | null> {
+  const supabase = await requireResearchOwner()
   const { data, error } = await supabase
     .from('causal_chains')
     .select(`

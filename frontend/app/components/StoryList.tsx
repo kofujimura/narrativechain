@@ -1,8 +1,5 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase, type CausalChain } from '../../lib/supabase'
+import { type CausalChain } from '../../lib/supabase'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('ja-JP', {
@@ -27,27 +24,8 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 export default function StoryList({ initial }: { initial: CausalChain[] }) {
-  const [chains, setChains] = useState<CausalChain[]>(initial)
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('causal_chains_realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'causal_chains' },
-        async (payload) => {
-          const { data } = await supabase
-            .from('causal_chains')
-            .select('*, trigger_events(id, summary, category, news_articles(title, source, url))')
-            .eq('id', payload.new.id)
-            .single()
-          if (data) setChains((prev) => [data as CausalChain, ...prev])
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [])
+  // Research data is fetched only on the authenticated server. Reload for updates.
+  const chains = initial
 
   if (chains.length === 0) {
     return (

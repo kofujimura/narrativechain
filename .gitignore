@@ -2,8 +2,13 @@ node_modules/
 .env
 .env~
 .env.local
+.env.*
+!.env.example
+!**/.env.example
 frontend/node_modules/
 frontend/.next/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
 result.json
 /research/
 .DS_Store

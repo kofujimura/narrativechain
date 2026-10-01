@@ -1,9 +1,12 @@
-import { supabase, type CausalChain } from '../lib/supabase'
+import { type CausalChain } from '../lib/supabase'
+import { requireResearchOwner } from '../lib/research-auth'
+import { signOut } from './auth/actions'
 import StoryList from './components/StoryList'
 
 export const dynamic = 'force-dynamic'
 
 async function fetchChains(): Promise<CausalChain[]> {
+  const supabase = await requireResearchOwner()
   const { data, error } = await supabase
     .from('causal_chains')
     .select('*, trigger_events(id, summary, category, news_articles(title, source, url))')
@@ -11,7 +14,7 @@ async function fetchChains(): Promise<CausalChain[]> {
     .limit(50)
 
   if (error) {
-    console.error('fetchChains error:', error)
+    console.error('Research data could not be loaded')
     return []
   }
   return data as CausalChain[]
@@ -27,8 +30,11 @@ export default async function Home() {
           NarrativeChain
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          ニュースから生成された未来の因果連鎖
+          個人研究専用 · ニュースから生成された未来の因果連鎖
         </p>
+        <form action={signOut} className="mt-4">
+          <button className="text-xs text-zinc-500 underline">ログアウト</button>
+        </form>
       </header>
       <StoryList initial={chains} />
     </main>
