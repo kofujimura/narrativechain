@@ -7,6 +7,7 @@ Hermes / Codex の `$narrative-story` が出力する `story-N.json` と、`$nar
 1. [本人限定認証](PRIVATE_RESEARCH_SETUP.md)を設定し、本番に反映します。既存の Google セッション SQL まで適用してください。
 2. Supabase SQL Editor で [`20261001_research_documents.sql`](../db/migrations/20261001_research_documents.sql)を適用します。新テーブルのみを追加し、従来の物語は削除しません。
 3. CLI を使う場合、Supabase Authentication → URL Configuration → Redirect URLs に **`http://localhost:4318/callback`** を追加します。Google Cloud の callback ではなく Supabase 側の許可リストです。
+   本番 Web 用には Site URL を本番 origin、Redirect URLs を **`https://research.example.com/auth/callback`** に設定します。Web のログイン後に localhost へ戻る場合、本番 callback が未登録または一致していない可能性があります。CLI callback の登録だけでは Web 用の設定を代替できません。
 4. リポジトリのルートで `npm ci`。Node.js 22.13 以上を使用します。
 
 ## Web から取り込む
@@ -51,3 +52,5 @@ npm run publish -- publish --site https://research.example.com --input /absolute
 ## 開発時の検証（2026-10-01）
 
 ローカル 32 件、frontend の認証・JSON・PostgreSQL RLS 10 件、分離した production build と実 HTTP 2 件が成功。HTTP テストでは未認証 / 他ユーザー / 偽造トークンの拒否、本人の登録・重複排除・ダウンロード、Web の Server Action の本人認可、調査と物語の関連付けを確認しています。CLI の模擬 PKCE テストでは本人認可後だけ認証情報を `0600` で保存し、拒否・時間切れ時は保存しないことを確認しています。型検査・lint・両スキルのバリデーションも成功しました。これらはクラウドでの本人閲覧確認とは別の検証です。
+
+本番へのコード・環境設定反映後、実際の本人 Google PKCE ログインと CLI の物語登録が成功。同じ物語の再登録は重複を作らず同じ URL を返しました。登録済み物語は匿名の Web ページから307、JSON APIとSupabase直接アクセスから401で拒否され、本文は返りませんでした。本番 Web の本人閲覧は Supabase の本番callback設定後に別途確認します。
