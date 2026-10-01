@@ -2,6 +2,7 @@ import { type CausalChain } from '../lib/supabase'
 import { requireResearchOwner } from '../lib/research-auth'
 import { signOut } from './auth/actions'
 import StoryList from './components/StoryList'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,7 @@ export default async function Home() {
         <p className="mt-1 text-sm text-zinc-500">
           個人研究専用 · ニュースから生成された未来の因果連鎖
         </p>
+        <Link href="/research" className="mt-4 inline-block text-sm underline">スキルの物語・調査レポート →</Link>
         <form action={signOut} className="mt-4">
           <button className="text-xs text-zinc-500 underline">ログアウト</button>
         </form>

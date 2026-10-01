@@ -1,6 +1,6 @@
 # NarrativeChain Local Studio
 
-ローカル専用の「ニュース → 物語 → 気になった仮説だけ調査する」Webアプリです。本番のNext.js・Supabase・定期収集ワーカーから独立し、Node.jsの標準機能で動きます。
+ローカル専用の「ニュース → 物語 → 気になった仮説だけ調査する」Webアプリです。本番のNext.js・Supabase・定期収集ワーカーから独立し、Node.jsの標準機能で動きます。必要な生成結果だけ本人専用 Vercel サイトに JSON 登録する任意の [登録CLI](../docs/PUBLISH_RESEARCH.md)もあります。ローカル生成には登録先への接続は不要です。
 
 ## 起動と操作
 

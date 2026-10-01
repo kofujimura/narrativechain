@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test test/auth-policy.test.mjs test/rls.test.mjs",
+    "test": "node --test test/auth-policy.test.mjs test/rls.test.mjs test/artifact-format.test.mjs",
     "test:http": "node test/run-http.mjs",
     "typecheck": "tsc --noEmit"
   },

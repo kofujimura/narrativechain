@@ -23,4 +23,8 @@ For theme purity, use the relevant theme's revenue divided by the same entity's 
 
 Consider substitution, existing capacity, internal procurement, overseas sourcing, timing, chain distance, project concentration and financing conditions. Research should test the story, not only find supporting companies. Give conditions that would falsify it. Do not claim precision, returns, or a buy recommendation from the report.
 
+## Optional private-site registration
+
+Only when requested, publish the validated `report.json` from the NarrativeChain repository with `npm run publish -- publish --site <explicit-site-origin> --input <absolute-report-path> --parent <original-story-UUID>`. Omit `--parent` only for an intentionally standalone report. Initial Google login is a human step: `npm run publish -- login --site <origin>`. Do not read the publisher auth file or paste credentials into context. The helper handles owner authentication and returns the private page URL. Preserve local results and report failures without automatic retries or changing accounts/destinations. See `docs/PUBLISH_RESEARCH.md`; mark fictional demo reports with the documented `demo: true` wrapper.
+
 When this skill is provided by the CLI with a JSON schema, return only that final schema. The source facts, reasoning and uncertainty must agree across sections. The first pass is allowed to identify no confirmed supplier and calculate no ratio.

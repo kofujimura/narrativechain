@@ -9,6 +9,7 @@
     "local:test": "node --test local/test/*.test.js",
     "investigate": "node local/research-cli.js",
     "narrative": "node local/story-cli.js",
+    "publish": "node local/publish-cli.js",
     "skill:install": "node local/install-skill.js",
     "start": "node local/server.js",
     "service:start": "node main.js",

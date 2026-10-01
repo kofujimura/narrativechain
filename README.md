@@ -8,7 +8,7 @@
 
 ## 本人専用 Web 研究サイト
 
-`frontend/` の Vercel サイトは Google 認証と本人限定のサーバー認可・Supabase RLS を使用します。許可アカウントは公開ソースに記載せず、非公開の環境変数と DB で設定します。**本番反映前に DB の非公開化と Google OAuth の設定が必要です。** [設定手順](docs/PRIVATE_RESEARCH_SETUP.md)を参照してください。Hermes の生成 HTML の登録は別工程です。
+`frontend/` の Vercel サイトは Google 認証と本人限定のサーバー認可・Supabase RLS を使用します。許可アカウントは公開ソースに記載せず、非公開の環境変数と DB で設定します。**本番反映前に DB の非公開化と Google OAuth の設定が必要です。** [設定手順](docs/PRIVATE_RESEARCH_SETUP.md)を参照してください。Hermes / Codex の生成結果は JSON を登録し、`/research` で HTML を安全に再生成して表示できます。[登録CLIとWeb取り込み](docs/PUBLISH_RESEARCH.md)を参照してください。
 
 以下は旧RSS/Supabaseサービスの説明です。こちらはAPI従量課金の別経路で、`NARRATIVE_LLM_BACKEND=api npm run service:start` と明示した場合のみ起動します。`npm start` はローカル・サブスク版に変更しました。
 

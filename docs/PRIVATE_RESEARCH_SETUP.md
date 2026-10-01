@@ -114,7 +114,7 @@ npm run dev
 - `getClaims()` で署名を検証した今回の OAuth 認証を確認し、`getUser()` の最新 Google ID と照合します。DB では同じ条件に加えて Auth 管理の有効セッションと OAuth 記録を確認します。`app_metadata.provider` / 編集可能な `user_metadata` / 未検証の JWT decode は認可根拠にしません。Google だけを OAuth provider として有効にする設定が必要で、複数 OAuth provider の共存をサポートする実装ではありません。
 - ブラウザーの匿名 Realtime 購読は削除しました。新しい物語の確認はページを再読み込みしてください。
 - コードを公開しても許可アカウントと研究データは含まれません。ただし、ログイン中のブラウザーには当然その本人向けのデータが届きます。
-- Hermes 生成 HTML / JSON の登録 CLI と Vercel 表示ルートは未実装です。現在は従来の Supabase 物語を表示します。登録処理を追加する際も、取得 API の入口で `requireResearchOwner()` と private Storage を使用してください。任意 HTML はスクリプトを許可せず sandbox で分離します。
+- Hermes / Codex の生成 JSON の登録 CLI と `/research` の表示ルートを追加しました。追加 SQL と CLI callback の設定は [登録手順](PUBLISH_RESEARCH.md)を参照してください。本人の Google セッションと RLS で読み書きを認可し、任意 HTML は受け付けません。JSON から再生成した HTML はスクリプト・同一 origin 権限のない sandbox で分離します。
 - 認証は転載許諾ではありません。元ニュース全文は利用条件・著作権を別途確認してください。共有する場合は、原文を含まない要約・必要な引用・出典 URL を基本とします。
 
 設定変更は `.env.local` / Vercel / Supabase / Google 管理画面で行います。このリポジトリへ個人設定や秘密情報をコミットしないでください。

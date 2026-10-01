@@ -5,6 +5,7 @@ import { PGlite } from '@electric-sql/pglite'
 
 const migration = await readFile(new URL('../../db/migrations/20261001_private_research.sql', import.meta.url), 'utf8')
 const sessionMigration = await readFile(new URL('../../db/migrations/20261001_google_session.sql', import.meta.url), 'utf8')
+const documentMigration = await readFile(new URL('../../db/migrations/20261001_research_documents.sql', import.meta.url), 'utf8')
 const tables = ['news_articles', 'trigger_events', 'causal_chains', 'chain_nodes']
 const ownerId = '00000000-0000-0000-0000-000000000001'
 const otherId = '00000000-0000-0000-0000-000000000002'
@@ -44,6 +45,8 @@ test('PostgreSQL RLS denies anon/non-owner even with legacy allow-all policies',
     await db.exec(migration) // Idempotent; no owner is hardcoded or reset.
     await db.exec(sessionMigration)
     await db.exec(sessionMigration)
+    await db.exec(documentMigration)
+    await db.exec(documentMigration)
     assert.equal((await db.query("select public from storage.buckets where id = 'research-artifacts'")).rows[0].public, false)
     await db.query('insert into auth.users values ($1, $2, now()), ($3, $4, now())', [ownerId, 'researcher@example.com', otherId, 'other@example.com'])
     for (const [id, email] of [[ownerId, 'researcher@example.com'], [otherId, 'other@example.com']]) {
@@ -64,11 +67,14 @@ test('PostgreSQL RLS denies anon/non-owner even with legacy allow-all policies',
     await db.query('insert into research_private.owner_config (email) values ($1)', ['researcher@example.com'])
 
     await as('anon', null)
+    await assert.rejects(db.query('select * from research_documents'), /permission denied/)
     for (const table of tables) await assert.rejects(db.query(`select * from ${table}`), /permission denied/)
     assert.deepEqual((await db.query('select id from storage.objects')).rows, [{ id: 2 }])
     await assert.rejects(db.query('select public.is_research_owner()'), /permission denied/)
 
     await as('authenticated', otherId)
+    assert.equal((await db.query('select * from research_documents')).rows.length, 0)
+    await assert.rejects(db.query("insert into research_documents (kind,title,summary,packet,content_hash) values ('story','private','secret','{}', repeat('a',64))"), /row-level security/)
     assert.equal((await db.query('select public.is_research_owner() as allowed')).rows[0].allowed, false)
     for (const table of tables) assert.equal((await db.query(`select * from ${table}`)).rows.length, 0)
     assert.deepEqual((await db.query('select id from storage.objects')).rows, [{ id: 2 }])
@@ -76,6 +82,13 @@ test('PostgreSQL RLS denies anon/non-owner even with legacy allow-all policies',
 
     await as('authenticated', ownerId, 'email')
     assert.equal((await db.query('select public.is_research_owner() as allowed')).rows[0].allowed, true)
+    await db.exec("insert into research_documents (kind,title,summary,packet,content_hash) values ('story','private','secret','{}', repeat('a',64))")
+    assert.equal((await db.query('select * from research_documents')).rows.length, 1)
+    await assert.rejects(db.query("update research_documents set title = 'changed'"), /permission denied/)
+    await assert.rejects(db.query('delete from research_documents'), /permission denied/)
+    await as('authenticated', otherId)
+    assert.equal((await db.query('select * from research_documents')).rows.length, 0)
+    await as('authenticated', ownerId)
     for (const patch of [
       { amr: [{ method: 'password' }] }, { amr: [] }, { amr: null }, { amr: {} },
       { amr: [{ method: 'oauth', provider: 'github' }] }, { amr: [{ method: 'oauth' }, { method: 'invite' }] },

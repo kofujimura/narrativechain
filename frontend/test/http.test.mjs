@@ -2,10 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
-import { createHmac } from 'node:crypto'
+import { createHmac, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { access } from 'node:fs/promises'
 import { httpTestEnvironment } from './http-env.mjs'
+import { storyPacket, reportPacket } from './artifact-fixtures.mjs'
 
 const run = process.env.NARRATIVE_HTTP_TEST_RUN
 const validRun = typeof run === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(run)
@@ -56,6 +57,8 @@ test('Next HTTP boundaries: anonymous/other/forged denied, owner allowed, PKCE c
   let reads = 0
   let authCalls = 0
   let invalidTokens = 0
+  let documentReads = 0, documentWrites = 0
+  const documents = new Map()
   const mock = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json')
     const path = new URL(request.url, 'http://localhost').pathname
@@ -75,6 +78,24 @@ test('Next HTTP boundaries: anonymous/other/forged denied, owner allowed, PKCE c
       return json(session(body.auth_code === 'other-code' ? 'other@example.com' : ownerEmail, body.auth_code === 'linked-code' ? 'email-linked' : body.auth_code === 'password-code' ? 'email-linked-password' : 'google'))
     }
     if (path === '/rest/v1/rpc/is_research_owner') return json(databaseAllowed && u?.email === ownerEmail)
+    if (path === '/rest/v1/research_documents') {
+      assert.equal(u?.email, ownerEmail)
+      assert.ok(databaseAllowed)
+      if (request.method === 'POST') {
+        documentWrites++
+        let raw = ''; for await (const chunk of request) raw += chunk
+        const item = JSON.parse(raw)
+        if ([...documents.values()].some(d => d.content_hash === item.content_hash)) return json({ code: '23505' }, 409)
+        const record = { ...item, id: randomUUID(), created_at: new Date().toISOString() }
+        documents.set(record.id, record)
+        return json(record, 201)
+      }
+      documentReads++
+      const query = new URL(request.url, 'http://localhost').searchParams
+      let rows = [...documents.values()]
+      for (const key of ['id', 'content_hash', 'parent_id']) if (query.has(key)) rows = rows.filter(d => d[key] === query.get(key).slice(3))
+      return json(request.headers.accept?.includes('object') ? rows[0] ?? null : rows)
+    }
     if (path === '/rest/v1/causal_chains') {
       reads++
       assert.equal(u?.email, ownerEmail)
@@ -120,7 +141,7 @@ test('Next HTTP boundaries: anonymous/other/forged denied, owner allowed, PKCE c
     assert.equal(unknownReason.status, 200)
 
     for (const cookie of [undefined, 'sb-localhost-auth-token=base64-invalid', sessionCookie('other@example.com'), sessionCookie(ownerEmail, 'email'), sessionCookie(ownerEmail, 'email-linked-password'), sessionCookie(ownerEmail, 'github')]) {
-      for (const path of ['/', '/story/test-story']) {
+      for (const path of ['/', '/story/test-story', '/research', '/research/import', '/research/00000000-0000-0000-0000-000000000099']) {
         const response = await fetchPage(path, cookie)
         assert.ok([303, 307].includes(response.status), `${path}: ${response.status}`)
         assert.match(response.headers.get('location'), /^\/login/)
@@ -128,6 +149,7 @@ test('Next HTTP boundaries: anonymous/other/forged denied, owner allowed, PKCE c
       }
     }
     assert.equal(reads, 0)
+    assert.equal(documentReads, 0)
     const ownerCookie = sessionCookie(ownerEmail)
     for (const path of ['/', '/story/test-story']) {
       const response = await fetchPage(path, ownerCookie)
@@ -149,6 +171,75 @@ test('Next HTTP boundaries: anonymous/other/forged denied, owner allowed, PKCE c
     assert.match(blocked.headers.get('location'), /configuration/)
     assert.equal(reads, initialReads)
     databaseAllowed = true
+
+    // New JSON publication and download boundaries use the same owner check.
+    const documentPath = '/api/research/documents'
+    const post = (packet, token = session(ownerEmail, 'google').access_token, extra = {}) => fetchPage(documentPath, undefined, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...extra }, body: JSON.stringify({ packet }),
+    })
+    const publicConfig = await fetchPage('/api/research/config')
+    assert.equal(publicConfig.status, 200)
+    const configJSON = await publicConfig.json()
+    assert.deepEqual(Object.keys(configJSON).sort(), ['publishable_key', 'supabase_url'])
+    for (const token of [session('other@example.com', 'google').access_token, session(ownerEmail, 'email-linked-password').access_token, 'forged.token.signature']) {
+      const denied = await post(storyPacket(), token)
+      assert.ok([401, 403].includes(denied.status))
+    }
+    const unauthorized = await fetchPage(documentPath, undefined, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{}' })
+    assert.equal(unauthorized.status, 401)
+    assert.equal((await post(storyPacket(), undefined, { Origin: 'https://evil.example.com' })).status, 403)
+    assert.equal(documentWrites, 0)
+    const invalid = await post({ html: '<script>injected</script>' })
+    assert.equal(invalid.status, 400)
+    const oversize = await post({ text: 'x'.repeat(250000) })
+    assert.equal(oversize.status, 413)
+    const inserted = await post(storyPacket())
+    assert.equal(inserted.status, 201)
+    const receipt = await inserted.json()
+    assert.equal(receipt.duplicate, false)
+    const repeated = await post(storyPacket())
+    assert.equal(repeated.status, 200)
+    assert.deepEqual(await repeated.json(), { ...receipt, duplicate: true })
+    const beforeBlocked = documentWrites
+    databaseAllowed = false
+    assert.equal((await post(storyPacket())).status, 403)
+    assert.equal(documentWrites, beforeBlocked)
+    databaseAllowed = true
+    const apiURL = `${documentPath}/${receipt.id}`
+    for (const cookie of [undefined, sessionCookie('other@example.com')]) {
+      const blockedDownload = await fetchPage(apiURL, cookie)
+      assert.ok([401, 403].includes(blockedDownload.status))
+      assert.ok(!(await blockedDownload.text()).includes('PRIVATE_ARTIFACT_SENTINEL'))
+    }
+    const downloaded = await fetchPage(apiURL, ownerCookie)
+    assert.equal(downloaded.status, 200)
+    assert.match(downloaded.headers.get('content-disposition'), /attachment/)
+    assert.match(downloaded.headers.get('cache-control'), /private.*no-store/)
+    assert.equal((await downloaded.json()).story.title, 'PRIVATE_ARTIFACT_SENTINEL')
+    const detail = await fetchPage(receipt.path, ownerCookie)
+    assert.equal(detail.status, 200)
+    const detailHTML = await detail.text()
+    assert.match(detailHTML, /PRIVATE_ARTIFACT_SENTINEL/)
+    assert.match(detailHTML, /sandbox="allow-popups allow-popups-to-escape-sandbox"/)
+    assert.ok(!detailHTML.includes('sandbox="allow-scripts'))
+    const importPage = await fetchPage('/research/import', ownerCookie)
+    const importHTML = await importPage.text()
+    const importAction = importHTML.match(/name="(\$ACTION_ID_[^"]+)"/)[1]
+    const upload = cookie => {
+      const form = new FormData(); form.set(importAction, ''); form.set('packet', new File([JSON.stringify(reportPacket())], 'report.json')); form.set('parent', receipt.id)
+      return fetchPage('/research/import', undefined, { method: 'POST', headers: { Origin: origin, ...(cookie ? { Cookie: cookie } : {}) }, body: form })
+    }
+    const beforeAction = documentWrites
+    assert.match((await upload(sessionCookie('other@example.com'))).headers.get('location'), /\/login/)
+    assert.equal(documentWrites, beforeAction)
+    const uploaded = await upload(ownerCookie)
+    assert.equal(uploaded.status, 303)
+    assert.match(uploaded.headers.get('location'), /^\/research\/[a-f0-9-]+$/)
+    assert.equal(documentWrites, beforeAction + 1)
+    const reportRecord = [...documents.values()].find(d => d.kind === 'investigation')
+    assert.equal(reportRecord.parent_id, receipt.id)
+    const wrongParent = await fetchPage(documentPath, undefined, { method: 'POST', headers: { Authorization: `Bearer ${session(ownerEmail, 'google').access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ packet: reportPacket(), parent_id: reportRecord.id }) })
+    assert.equal(wrongParent.status, 400)
 
     // Forged JWT with owner's email cannot pass Auth verification.
     const forged = session(ownerEmail, 'google')
@@ -229,6 +320,7 @@ test('missing configuration fails closed without connecting to Supabase', { time
     }
     const callback = await fetch(`${origin}/auth/callback?code=owner-code`, { redirect: 'manual' })
     assert.equal(callback.status, 503)
+    for (const path of ['/api/research/config', '/api/research/auth', '/api/research/documents/00000000-0000-0000-0000-000000000099']) assert.equal((await fetch(`${origin}${path}`)).status, 503)
   } finally {
     const exited = child.exitCode === null ? once(child, 'exit') : Promise.resolve()
     child.kill('SIGTERM')
