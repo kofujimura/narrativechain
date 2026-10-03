@@ -13,6 +13,11 @@ test('JSON artifacts normalize idempotently; export timestamps do not affect ide
   const later = storyPacket(); later.exported_at = '2026-10-02T00:00:00Z'
   assert.deepEqual(normalizeArtifact(later), first)
 })
+test('rejects embedded NUL in nested source text before a jsonb write', () => {
+  const packet = storyPacket()
+  packet.story.facts[0].text += '\u0000'
+  assert.throws(() => normalizeArtifact(packet), /NUL/)
+})
 test('rendered news/model text is inert and internal downloads are removed', () => {
   const packet = storyPacket()
   packet.story.narrative = '<script>alert(1)</script><img src=x onerror=alert(2)>'

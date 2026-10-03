@@ -16,6 +16,7 @@ function check(value, schema, depth = 0) {
   const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
   if (!(Array.isArray(schema.type) ? schema.type : [schema.type]).includes(type)) throw Error('JSONの型が不正です。')
   if (schema.enum && !schema.enum.includes(value)) throw Error('JSONの区分が不正です。')
+  if (type === 'string' && value.includes('\u0000')) throw Error('JSONにNUL文字が含まれています。')
   if (type === 'string' && value.length > (schema.maxLength ?? 15000)) throw Error('JSONの文章が長すぎます。')
   if (type === 'number' && !Number.isFinite(value)) throw Error('JSONの数値が不正です。')
   if (type === 'array') {

@@ -18,6 +18,11 @@ test('HTML extracts inert text and ignores script/style, without executing resou
   const result = htmlToNews('<title>A &amp; B</title><script>evil()</script><article><h1>News</h1><p>Useful &lt;text&gt; &#x65e5;</p><img src="http://127.0.0.1"></article>')
   assert.equal(result.title, 'A & B'); assert.match(result.body, /Useful <text> 日/); assert.doesNotMatch(result.body, /evil|127/)
 })
+test('news ingestion removes embedded NUL before creating a publishable evidence packet', async () => {
+  const article = await normalizeInputs([{ type: 'html', content: '<title>発電</title><article>福岡の発電所で蓄電池によ\u0000る自動運用を開始しました。市場への入札と充放電計画を統合します。</article>' }])
+  assert.equal(article[0].body, '福岡の発電所で蓄電池による自動運用を開始しました。市場への入札と充放電計画を統合します。')
+  assert.equal(article[0].body.includes('\u0000'), false)
+})
 test('multiple text/html/json inputs and limits', async () => {
   const value = '社会の供給制約を変える新しい発表です。具体的な技術と実証計画が公表されました。'
   const result = await normalizeInputs([{ type: 'text', content: value }, { type: 'json', content: JSON.stringify({ title: 'JSON', facts: [value] }) }, { type: 'html', content: `<article>${value}</article>` }])

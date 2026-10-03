@@ -66,10 +66,11 @@ export async function normalizeInputs(inputs, { signal, fetcher = downloadNews }
       article = { title: String(data.title || input.name || 'JSONニュース'), body: typeof data.body === 'string' ? data.body : Array.isArray(data.facts) ? data.facts.join('\n') : '' }
       if (data.url) url = checkURL(data.url).href
     } else article = { title: String(input.name || input.content.split('\n')[0]).slice(0, 200), body: input.content }
-    article.body = article.body.trim().slice(0, MAX_TEXT)
+    // PostgreSQL jsonb rejects escaped NUL (22P05); discard it before evidence is packaged.
+    article.body = article.body.replace(/\u0000/g, '').trim().slice(0, MAX_TEXT)
     if (article.body.length < 30) throw Error('本文が短すぎます。本文を取得できないURLはHTML/テキストで入力してください。')
     articles.push({ ...article, id: `news-${articles.length + 1}`, url, source: url ? new URL(url).hostname : 'ユーザー入力',
-      original_characters: input.content.length, retrieved_at: new Date().toISOString(), title: article.title.slice(0, 200) })
+      original_characters: input.content.length, retrieved_at: new Date().toISOString(), title: article.title.replace(/\u0000/g, '').slice(0, 200) })
   }
   return articles
 }
